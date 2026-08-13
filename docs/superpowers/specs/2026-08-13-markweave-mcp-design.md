@@ -31,11 +31,12 @@ The vault's own `CLAUDE.md` names `앱/remotely-save/obsidian` as canonical. Tha
 
 ## Architecture
 
-One container, one process, six modules:
+One container, one process, seven modules:
 
 | Module | Responsibility |
 |---|---|
 | `config.py` | Env-only settings; frozen at startup |
+| `errors.py` | The error taxonomy below, as exception types |
 | `paths.py` | Vault-relative path validation and NFC handling |
 | `search.py` | Pure-Python note scan and snippet extraction |
 | `notes.py` | Read, create, append, update; sha256; atomic replace |
