@@ -1,0 +1,28 @@
+# MarkWeave MCP.
+#
+# No port is published: Kiro Crew reaches this service by name on the shared
+# Docker network, and nothing outside that network can connect. For local
+# debugging with MCP Inspector, uncomment the ports block below.
+services:
+  markweave-mcp:
+    build:
+      context: .
+      args:
+        GRAPHIFY_VERSION: "0.9.35"
+    container_name: markweave-mcp
+    restart: unless-stopped
+    volumes:
+      - "${MARKWEAVE_VAULT_HOST:?set MARKWEAVE_VAULT_HOST to your vault path}:/vault"
+    environment:
+      MARKWEAVE_VAULT: /vault
+      MARKWEAVE_GRAPH: /vault/graphify-out/graph.json
+    # ports:
+    #   - "127.0.0.1:8000:8000"
+    networks:
+      - kirocrew
+
+networks:
+  kirocrew:
+    # The network Kiro Crew already runs on.
+    external: true
+    name: "${KIROCREW_NETWORK:-npm-proxy}"

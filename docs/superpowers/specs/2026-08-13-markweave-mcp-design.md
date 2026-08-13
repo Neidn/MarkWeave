@@ -26,7 +26,8 @@ The vault's own `CLAUDE.md` names `앱/remotely-save/obsidian` as canonical. Tha
 1. **No ripgrep.** A pure-Python scan of the whole corpus takes 0.22 s. Dropping ripgrep removes a binary dependency, a subprocess, a timeout, and an output cap. Plan §6 assumed ripgrep; SQLite FTS5 stays excluded as the plan says.
 2. **Six graph tools, not one.** graphify exposes `query`, `explain`, `path`, `affected`, `god-nodes`; all are wrapped, plus `graph_status`. Plan §5 listed only `query_graph`.
 3. **NFC normalization is mandatory.** macOS stores Korean filenames as NFD; MCP JSON carries NFC. Not normalizing means `"쿠버네티스.md"` fails to match the identical file on disk.
-4. **No HTTP auth.** The container sits on Kiro Crew's internal Docker network with no published port, which is the condition under which plan §10.4 says auth is unnecessary.
+4. **No HTTP auth.** The container sits on Kiro Crew's internal Docker network (`npm-proxy`) with no published port, which is the condition under which plan §10.4 says auth is unnecessary.
+5. **FastMCP 3.4.7 as the server framework.** The official `mcp` SDK is at 2.0.0, where the vendored `mcp.server.fastmcp` module no longer exists and the equivalent is `mcp.server.MCPServer`. The standalone FastMCP project is a separate, current package (3.4.7) and is what this server builds on; `mcp` comes in transitively.
 
 ## Architecture
 
@@ -41,7 +42,7 @@ One container, one process, six modules:
 | `graph.py` | Fixed-argv graphify subprocess wrapper |
 | `server.py` | Tool registration and schemas only — no logic |
 
-Deployment: `python:3.14-slim`, `uv tool install graphifyy==0.9.35` pinned to match the host that builds the graph. Vault bind-mounted read-write at `/vault`; `graphify-out/` rides along inside it. Joined to Kiro Crew's Docker network as `markweave-mcp`, reachable at `http://markweave-mcp:8000/mcp`. No published host port outside development.
+Deployment: `python:3.14-slim`, `uv tool install graphifyy==0.9.35` pinned to match the host that builds the graph. Vault bind-mounted read-write at `/vault`; `graphify-out/` rides along inside it. Joined to Kiro Crew's `npm-proxy` Docker network as `markweave-mcp`, reachable at `http://markweave-mcp:8000/mcp`. No published host port outside development.
 
 Config, from environment only, never from an MCP request: `MARKWEAVE_VAULT`, `MARKWEAVE_GRAPH`, `MARKWEAVE_MAX_RESULTS`, `MARKWEAVE_MAX_SNIPPET`, `MARKWEAVE_MAX_RESPONSE_BYTES`, `MARKWEAVE_MAX_FILE_BYTES`, `MARKWEAVE_GRAPH_TIMEOUT`.
 
