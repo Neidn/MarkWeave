@@ -42,6 +42,7 @@ Environment only — none of these are reachable from an MCP request.
 | `MARKWEAVE_MAX_RESPONSE_BYTES` | `64000` |
 | `MARKWEAVE_MAX_FILE_BYTES` | `2097152` |
 | `MARKWEAVE_GRAPH_TIMEOUT` | `30` |
+| `MARKWEAVE_STALE_AFTER_HOURS` | `24` |
 | `MARKWEAVE_HOST` / `MARKWEAVE_PORT` / `MARKWEAVE_PATH` | `0.0.0.0` / `8000` / `/mcp` |
 
 ## Running
@@ -87,6 +88,12 @@ MarkWeave never runs graphify. Refresh on the host when you want it:
 graphify update /path/to/vault
 ```
 
-`graph_status` reports `stale: true` when any note is newer than `graph.json`.
+`graph_status` reports how far the graph has fallen behind:
+
+```json
+{"notes_newer_than_graph": 3, "lag_hours": 1.4, "stale_after_hours": 24, "stale": false}
+```
+
+Any edit makes some note newer than the graph, so "newer than the graph" on its own would report stale almost always. `stale` turns true only once `lag_hours` exceeds `MARKWEAVE_STALE_AFTER_HOURS`.
 
 The graphify version pinned in the `Dockerfile` should match the host version that builds the graph.

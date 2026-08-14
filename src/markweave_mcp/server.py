@@ -43,6 +43,7 @@ def build_server(settings: Settings) -> FastMCP:
         graph_path=settings.graph_path,
         timeout=settings.graph_timeout,
         max_output_bytes=settings.max_response_bytes,
+        stale_after_hours=settings.stale_after_hours,
     )
 
     @mcp.tool(annotations=READ_ONLY)
