@@ -70,3 +70,60 @@ def test_write_tools_require_expected_sha256(vault):
     for name in ("append_note", "update_note"):
         required = (tools[name].parameters or {}).get("required", [])
         assert "expected_sha256" in required
+
+
+READ_TOOLS = {
+    "search_notes",
+    "read_note",
+    "query_graph",
+    "explain_node",
+    "graph_path",
+    "affected_nodes",
+    "god_nodes",
+    "graph_status",
+}
+
+WRITE_TOOLS = {"create_note", "append_note", "update_note"}
+
+
+def tools_by_name(vault):
+    settings = load_settings({"MARKWEAVE_VAULT": str(vault)})
+    server = build_server(settings)
+    return {t.name: t for t in asyncio.run(server.list_tools())}
+
+
+def test_read_tools_are_annotated_read_only(vault):
+    tools = tools_by_name(vault)
+
+    for name in READ_TOOLS:
+        annotations = tools[name].annotations
+        assert annotations is not None, f"{name} has no annotations"
+        assert annotations.readOnlyHint is True, name
+
+
+def test_write_tools_are_not_annotated_read_only(vault):
+    tools = tools_by_name(vault)
+
+    for name in WRITE_TOOLS:
+        assert tools[name].annotations.readOnlyHint is not True, name
+
+
+def test_mutating_tools_are_flagged_destructive(vault):
+    """append_note and update_note change existing notes; create_note cannot."""
+    tools = tools_by_name(vault)
+
+    for name in ("append_note", "update_note"):
+        assert tools[name].annotations.destructiveHint is True, name
+
+
+def test_create_note_is_not_destructive(vault):
+    """create_note fails on an existing path, so it never destroys anything."""
+    tools = tools_by_name(vault)
+
+    assert tools["create_note"].annotations.destructiveHint is False
+
+
+def test_write_tools_are_not_idempotent(vault):
+    tools = tools_by_name(vault)
+
+    assert tools["append_note"].annotations.idempotentHint is False

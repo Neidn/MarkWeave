@@ -18,6 +18,11 @@ DEFAULT_TIMEOUT = 30.0
 DEFAULT_MAX_OUTPUT_BYTES = 64_000
 DEFAULT_BUDGET = 2000
 
+# Any edit makes some note newer than the graph, so "newer than the graph" alone
+# would report stale almost always and mean nothing. Report the lag instead, and
+# only call it stale once the graph has fallen behind by more than this.
+DEFAULT_STALE_AFTER_HOURS = 24.0
+
 SKIP_DIRECTORIES = {"graphify-out", ".obsidian", ".git", ".trash"}
 
 
@@ -28,11 +33,13 @@ class GraphClient:
         graph_path: Path,
         timeout: float = DEFAULT_TIMEOUT,
         max_output_bytes: int = DEFAULT_MAX_OUTPUT_BYTES,
+        stale_after_hours: float = DEFAULT_STALE_AFTER_HOURS,
     ) -> None:
         self._executable = executable
         self._graph_path = Path(graph_path)
         self._timeout = timeout
         self._max_output_bytes = max_output_bytes
+        self._stale_after_hours = stale_after_hours
 
     def query(
         self,
@@ -70,22 +77,33 @@ class GraphClient:
     def status(self, vault_root: Path) -> dict:
         """Never raises: a broken graph must not disable the vault tools."""
         if not self._graph_path.is_file():
+            newest, _ = _note_mtimes(vault_root, since=None)
             return {
                 "available": False,
                 "graph_path": str(self._graph_path),
                 "generated_at": None,
-                "latest_markdown_mtime": _iso(_latest_markdown_mtime(vault_root)),
+                "latest_markdown_mtime": _iso(newest),
+                "notes_newer_than_graph": None,
+                "lag_hours": None,
+                "stale_after_hours": self._stale_after_hours,
                 "stale": True,
             }
 
         graph_mtime = self._graph_path.stat().st_mtime
-        newest_note = _latest_markdown_mtime(vault_root)
+        newest_note, newer_count = _note_mtimes(vault_root, since=graph_mtime)
+        lag_hours = 0.0
+        if newest_note is not None and newest_note > graph_mtime:
+            lag_hours = round((newest_note - graph_mtime) / 3600, 2)
+
         return {
             "available": True,
             "graph_path": str(self._graph_path),
             "generated_at": _iso(graph_mtime),
             "latest_markdown_mtime": _iso(newest_note),
-            "stale": newest_note is not None and newest_note > graph_mtime,
+            "notes_newer_than_graph": newer_count,
+            "lag_hours": lag_hours,
+            "stale_after_hours": self._stale_after_hours,
+            "stale": lag_hours > self._stale_after_hours,
         }
 
     def _graph_flag(self) -> list[str]:
@@ -129,8 +147,10 @@ def _clip(text: str, limit: int) -> tuple[str, bool]:
     return text[:limit], True
 
 
-def _latest_markdown_mtime(vault_root: Path) -> float | None:
+def _note_mtimes(vault_root: Path, since: float | None) -> tuple[float | None, int]:
+    """Return the newest note mtime and how many notes are newer than `since`."""
     newest = None
+    newer = 0
     for note in Path(vault_root).rglob("*.md"):
         if SKIP_DIRECTORIES.intersection(note.parts):
             continue
@@ -140,7 +160,9 @@ def _latest_markdown_mtime(vault_root: Path) -> float | None:
             continue
         if newest is None or mtime > newest:
             newest = mtime
-    return newest
+        if since is not None and mtime > since:
+            newer += 1
+    return newest, newer
 
 
 def _iso(timestamp: float | None) -> str | None:

@@ -137,7 +137,8 @@ def test_status_reports_available_and_generated_at(tmp_path, graph_file, vault):
     assert status["generated_at"].startswith("20")
 
 
-def test_status_reports_stale_when_note_is_newer_than_graph(tmp_path, graph_file, vault):
+def test_status_counts_a_newer_note_without_calling_it_stale(tmp_path, graph_file, vault):
+    """One note a minute newer is lag to report, not a stale graph."""
     note = vault / "fresh.md"
     note.write_text("new", encoding="utf-8")
     future = time.time() + 60
@@ -145,7 +146,8 @@ def test_status_reports_stale_when_note_is_newer_than_graph(tmp_path, graph_file
 
     status = GraphClient(executable="/unused", graph_path=graph_file).status(vault)
 
-    assert status["stale"] is True
+    assert status["notes_newer_than_graph"] == 1
+    assert status["stale"] is False
 
 
 def test_status_not_stale_when_graph_is_newer(tmp_path, graph_file, vault):
@@ -165,3 +167,71 @@ def test_status_reports_unavailable_instead_of_raising(tmp_path, vault):
 
     assert status["available"] is False
     assert status["generated_at"] is None
+
+
+def test_status_reports_lag_hours_and_newer_note_count(tmp_path, graph_file, vault):
+    for name in ("a.md", "b.md"):
+        note = vault / name
+        note.write_text("x", encoding="utf-8")
+        future = time.time() + 3600
+        os.utime(note, (future, future))
+    old = vault / "old.md"
+    old.write_text("x", encoding="utf-8")
+    past = time.time() - 7200
+    os.utime(old, (past, past))
+
+    status = GraphClient(executable="/unused", graph_path=graph_file).status(vault)
+
+    assert status["notes_newer_than_graph"] == 2
+    assert status["lag_hours"] == pytest.approx(1.0, abs=0.1)
+
+
+def test_recent_edit_is_not_stale_within_tolerance(tmp_path, graph_file, vault):
+    """A note touched minutes after a rebuild must not read as stale."""
+    note = vault / "fresh.md"
+    note.write_text("x", encoding="utf-8")
+    soon = time.time() + 360
+    os.utime(note, (soon, soon))
+
+    status = GraphClient(
+        executable="/unused", graph_path=graph_file, stale_after_hours=24
+    ).status(vault)
+
+    assert status["stale"] is False
+    assert status["notes_newer_than_graph"] == 1
+
+
+def test_stale_once_lag_exceeds_tolerance(tmp_path, graph_file, vault):
+    note = vault / "fresh.md"
+    note.write_text("x", encoding="utf-8")
+    much_later = time.time() + 48 * 3600
+    os.utime(note, (much_later, much_later))
+
+    status = GraphClient(
+        executable="/unused", graph_path=graph_file, stale_after_hours=24
+    ).status(vault)
+
+    assert status["stale"] is True
+
+
+def test_lag_is_zero_when_no_note_is_newer(tmp_path, graph_file, vault):
+    note = vault / "old.md"
+    note.write_text("x", encoding="utf-8")
+    past = time.time() - 7200
+    os.utime(note, (past, past))
+
+    status = GraphClient(executable="/unused", graph_path=graph_file).status(vault)
+
+    assert status["lag_hours"] == 0.0
+    assert status["notes_newer_than_graph"] == 0
+    assert status["stale"] is False
+
+
+def test_missing_graph_reports_stale_with_no_lag(tmp_path, vault):
+    status = GraphClient(
+        executable="/unused", graph_path=tmp_path / "nope" / "graph.json"
+    ).status(vault)
+
+    assert status["available"] is False
+    assert status["stale"] is True
+    assert status["lag_hours"] is None

@@ -16,6 +16,7 @@ DEFAULT_MAX_RESPONSE_BYTES = 64_000
 DEFAULT_MAX_FILE_BYTES = 2 * 1024 * 1024
 DEFAULT_GRAPH_TIMEOUT = 30.0
 DEFAULT_GRAPHIFY_BIN = "graphify"
+DEFAULT_STALE_AFTER_HOURS = 24.0
 
 
 @dataclass(frozen=True)
@@ -28,6 +29,7 @@ class Settings:
     max_response_bytes: int
     max_file_bytes: int
     graph_timeout: float
+    stale_after_hours: float
 
 
 def load_settings(env: Mapping[str, str] | None = None) -> Settings:
@@ -60,4 +62,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         ),
         max_file_bytes=int(source.get("MARKWEAVE_MAX_FILE_BYTES", DEFAULT_MAX_FILE_BYTES)),
         graph_timeout=float(source.get("MARKWEAVE_GRAPH_TIMEOUT", DEFAULT_GRAPH_TIMEOUT)),
+        stale_after_hours=float(
+            source.get("MARKWEAVE_STALE_AFTER_HOURS", DEFAULT_STALE_AFTER_HOURS)
+        ),
     )
