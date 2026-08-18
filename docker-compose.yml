@@ -1,8 +1,19 @@
 # MarkWeave MCP.
 #
-# No port is published: Kiro Crew reaches this service by name on the shared
+# No port is published: Kiro Crew reaches this service by name on a dedicated
 # Docker network, and nothing outside that network can connect. For local
 # debugging with MCP Inspector, uncomment the ports block below.
+#
+# The network is deliberately NOT the shared npm-proxy network. MarkWeave has no
+# authentication of any kind — an unauthenticated caller that can reach it can
+# read the whole vault and call create_note/append_note/update_note. On npm-proxy
+# that meant every other container there (code-server, nginx-proxy-manager) had
+# write access, and a stray proxy host would have published it to the internet.
+# Reachability is therefore the access control: only containers explicitly joined
+# to markweave-net can talk to it. Kiro Crew joins both networks.
+#
+# Create it once (both stacks are separate compose projects, so it is external):
+#     docker network create markweave-net
 services:
   markweave-mcp:
     build:
@@ -19,10 +30,10 @@ services:
     # ports:
     #   - "127.0.0.1:8000:8000"
     networks:
-      - kirocrew
+      - markweave
 
 networks:
-  kirocrew:
-    # The network Kiro Crew already runs on.
+  markweave:
+    # Dedicated, isolated network shared only with Kiro Crew.
     external: true
-    name: "${KIROCREW_NETWORK:-npm-proxy}"
+    name: "${MARKWEAVE_NETWORK:-markweave-net}"
