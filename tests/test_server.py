@@ -9,6 +9,7 @@ EXPECTED_TOOLS = {
     "create_note",
     "append_note",
     "update_note",
+    "move_note",
     "query_graph",
     "explain_node",
     "graph_path",
@@ -17,9 +18,11 @@ EXPECTED_TOOLS = {
     "graph_status",
 }
 
+# move_note was added deliberately (a move is reversible); delete stays out.
+# rename_note is absent because move_note covers renaming — a rename is a move
+# within one folder — not because renaming is disallowed.
 EXCLUDED_TOOLS = {
     "delete_note",
-    "move_note",
     "rename_note",
     "bulk_update",
     "graph_rebuild",
@@ -67,7 +70,7 @@ def test_write_tools_require_expected_sha256(vault):
     server = build_server(settings)
     tools = {tool.name: tool for tool in asyncio.run(server.list_tools())}
 
-    for name in ("append_note", "update_note"):
+    for name in ("append_note", "update_note", "move_note"):
         required = (tools[name].parameters or {}).get("required", [])
         assert "expected_sha256" in required
 
@@ -83,7 +86,7 @@ READ_TOOLS = {
     "graph_status",
 }
 
-WRITE_TOOLS = {"create_note", "append_note", "update_note"}
+WRITE_TOOLS = {"create_note", "append_note", "update_note", "move_note"}
 
 
 def tools_by_name(vault):
