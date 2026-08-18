@@ -80,6 +80,43 @@ def update_note(
     return {"path": path, "sha256": sha256_of(content)}
 
 
+def move_note(
+    vault_root: Path,
+    source: str,
+    destination: str,
+    expected_sha256: str,
+) -> dict:
+    """Move or rename a note. Content is never altered.
+
+    A rename is just a move within the same folder, so one function covers both.
+    The SHA-256 guard is kept even though the bytes do not change: it proves the
+    caller has actually read the note it is relocating, and it refuses to move a
+    file that some other editor has changed in the meantime.
+
+    Deliberately not paired with a delete tool — a move is reversible, so a wrong
+    one costs a second move, while a wrong delete costs the note.
+    """
+    src, current = _load_for_write(vault_root, source, expected_sha256)
+    dst = resolve_note_path(vault_root, destination)
+
+    # `dst.exists()` is true for a case-only or normalization-only rename on
+    # macOS, because APFS looks names up case- and NFC/NFD-insensitively while
+    # still storing what was written. Rejecting on existence alone would make
+    # `readme.md` -> `README.md`, or NFD -> NFC of one Korean name, look like a
+    # collision with another note. samefile() distinguishes "the same inode under
+    # another spelling" from "a different note already sitting there".
+    if dst.exists() and not src.samefile(dst):
+        raise NoteExists(f"{destination!r} already exists")
+
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    os.replace(src, dst)
+    return {
+        "source": source,
+        "path": destination,
+        "sha256": sha256_of(current),
+    }
+
+
 def _load_for_write(vault_root: Path, path: str, expected_sha256: str) -> tuple[Path, str]:
     target = resolve_note_path(vault_root, path)
     if not target.is_file():

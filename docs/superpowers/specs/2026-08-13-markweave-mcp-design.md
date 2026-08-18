@@ -49,13 +49,17 @@ Config, from environment only, never from an MCP request: `MARKWEAVE_VAULT`, `MA
 
 ## Tools
 
-Vault: `search_notes(query, limit?, folder?)`, `read_note(path)`, `create_note(path, content)`, `append_note(path, content, expected_sha256)`, `update_note(path, content, expected_sha256)`.
+Vault: `search_notes(query, limit?, folder?)`, `read_note(path)`, `create_note(path, content)`, `append_note(path, content, expected_sha256)`, `update_note(path, content, expected_sha256)`, `move_note(source, destination, expected_sha256)`.
 
 Graph: `query_graph`, `explain_node`, `graph_path`, `affected_nodes`, `god_nodes`, `graph_status`.
 
 Graph tools return `{ok, text, truncated, graph_generated_at}` — graphify emits prose, and parsing it would couple the server to another project's output formatting.
 
-Excluded, per plan §5.2: `delete_note`, `move_note`, `rename_note`, `bulk_update`, `graph_rebuild`, `shell_execute`, arbitrary file reads.
+Excluded, per plan §5.2: `delete_note`, `rename_note`, `bulk_update`, `graph_rebuild`, `shell_execute`, arbitrary file reads.
+
+`rename_note` is absent because `move_note` covers it — a rename is a move within one folder.
+
+**`move_note` added 2026-08-18**, against plan §5.2's original exclusion. Plan §16 gated delete/move on "생성·수정 기능이 안정화되고 승인 방식이 정해졌을 때". The first half holds. The second does not: Kiro Crew re-appends a blanket `@markweave` to `allowedTools` at every start, so writes auto-approve. Move was admitted anyway because it is **reversible** — a wrong move costs a second move — while `delete_note` stays excluded precisely because it is not. The vault made this cheap: 208 wikilinks are basename-only (Obsidian resolves them vault-wide), path-style links point at `images/…` from the vault root, all 93 markdown links are in-page anchors, and **zero** links resolve only relative to a note's own directory. So no link rewriting is required.
 
 ## 3. Safety and error handling
 
@@ -81,6 +85,7 @@ Required cases, from plan §15 plus the deviations:
 - NFD filename on disk found by NFC query
 - `create_note` on an existing path fails
 - `append_note` / `update_note` with a wrong sha256 returns a conflict and leaves the file byte-identical
+- `move_note` with a wrong sha256 moves nothing; refuses to overwrite an existing destination; allows a case-only or NFC/NFD-only rename, which on APFS reports the destination as already existing because it *is* the same inode (`samefile()` tells the two apart)
 - concurrent-write simulation: read, external modification, then write with the stale sha → conflict
 - search respects `folder`, result limit, and snippet cap
 - graphify timeout returns a tool error while the server stays up

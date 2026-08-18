@@ -34,6 +34,11 @@ CREATES = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentH
 # append_note and update_note change notes that already exist.
 MUTATES = ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=False)
 
+# move_note relocates a note without touching its bytes. Marked destructive because
+# the old path stops resolving, which breaks anything referencing it — but unlike an
+# edit it loses no content, and repeating the same move is a no-op once it has landed.
+MOVES = ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=True)
+
 
 def build_server(settings: Settings) -> FastMCP:
     mcp = FastMCP("markweave", instructions=INSTRUCTIONS)
@@ -80,6 +85,15 @@ def build_server(settings: Settings) -> FastMCP:
         return notes.update_note(
             vault, path, content, expected_sha256, max_bytes=settings.max_file_bytes
         )
+
+    @mcp.tool(annotations=MOVES)
+    def move_note(source: str, destination: str, expected_sha256: str) -> dict:
+        """Move or rename a note, only if its sha256 still matches expected_sha256.
+
+        Contents are unchanged. Refuses to overwrite an existing note. There is no
+        delete tool: a move can be undone by moving back.
+        """
+        return notes.move_note(vault, source, destination, expected_sha256)
 
     @mcp.tool(annotations=READ_ONLY)
     def query_graph(

@@ -15,15 +15,17 @@ The vault is the source of truth. `graph.json` is derived data that MarkWeave on
 | `create_note` | `path`, `content` |
 | `append_note` | `path`, `content`, `expected_sha256` |
 | `update_note` | `path`, `content`, `expected_sha256` |
+| `move_note` | `source`, `destination`, `expected_sha256` |
 
 **Graph** — `query_graph`, `explain_node`, `graph_path`, `affected_nodes`, `god_nodes`, `graph_status`.
 
-There is deliberately no delete, move, rename, bulk-update, graph-rebuild, or shell tool.
+There is deliberately no delete, bulk-update, graph-rebuild, or shell tool. `move_note` handles renaming too, since a rename is a move within one folder.
 
 ## Safety
 
 - Paths are vault-relative. `..`, absolute paths, non-`.md` files, and symlinks leading outside the vault are rejected after `realpath` resolution.
-- `append_note` and `update_note` require the note's current SHA-256. If the file changed on disk — Obsidian, Dropbox sync, another agent — the write is refused and nothing is modified.
+- `append_note`, `update_note`, and `move_note` require the note's current SHA-256. If the file changed on disk — Obsidian, Dropbox sync, another agent — the write is refused and nothing is modified.
+- `move_note` never overwrites: an existing destination is an error. A case-only or NFC/NFD-only rename is still allowed, because on macOS the destination "already exists" only in the sense that it is the same file.
 - Writes go to a temporary file in the target's own directory and land via `os.replace`, so a reader never sees a partial note.
 - graphify runs with `shell=False` and a fixed argument list. The graph path comes from configuration; no tool parameter can change it.
 - A missing, stale, or failing graph never disables the vault tools.
