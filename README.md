@@ -50,11 +50,15 @@ Environment only — none of these are reachable from an MCP request.
 ## Running
 
 ```bash
-cp .env.example .env          # set MARKWEAVE_VAULT_HOST and KIROCREW_NETWORK
+docker network create markweave-net   # once; both stacks are separate compose projects
+cp .env.example .env                  # set MARKWEAVE_VAULT_HOST
 docker compose up -d --build
 ```
 
-The service publishes no port. Kiro Crew reaches it on the shared Docker network:
+The service publishes no port and sits on its own network, shared only with Kiro Crew.
+MarkWeave has no authentication, so reachability is the access control — anything that
+can reach it can read the vault and call the write tools. Keep it off shared networks.
+Kiro Crew joins `markweave-net` alongside its own network and reaches it at:
 
 ```
 http://markweave-mcp:8000/mcp
